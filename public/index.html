@@ -7,113 +7,11 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      height: 100vh;
-      background-color: #f4f4f9;
-    }
-
-    #container {
-      display: flex;
-      width: 100%;
-      height: 100%;
-    }
-
-    #map {
-      height: 100%;
-      width: 70%;
-      border-right: 2px solid #388E3C;
-    }
-
-    #sensor-list {
-      width: 30%;
-      padding: 20px;
-      background-color: #fff;
-      box-sizing: border-box;
-      overflow-y: auto;
-      border-left: 2px solid #388E3C;
-    }
-
-    .sensor-item {
-      background-color: #f9f9f9;
-      padding: 10px;
-      border: 1px solid #ddd;
-      margin-bottom: 10px;
-      border-left: 5px solid #388E3C;
-      border-radius: 5px;
-      transition: background-color 0.3s;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .sensor-item.selected {
-      background-color: #d3d3d3;
-    }
-
-    .sensor-item.critical {
-      border-left: 5px solid #b22222;
-    }
-
-    .sensor-item.exceeded {
-      border-left: 5px solid #004d80;
-    }
-
-    .sensor-item.normal {
-      border-left: 5px solid #006400;
-    }
-
-    .sensor-item:hover {
-      background-color: #e0e0e0;
-    }
-
-    .logo {
-      display: block;
-      margin: 0 auto 20px;
-      width: 80%;
-      max-width: 150px;
-    }
-
-    .humidity-threshold {
-      width: 20%;
-      padding: 5px;
-      margin-right: 5px;
-      border-radius: 5px;
-      border: 1px solid #ddd;
-    }
-
-    select {
-      width: 40%;
-      padding: 5px;
-      border-radius: 5px;
-      border: 1px solid #ddd;
-    }
-
-    #search-bar {
-      margin-bottom: 10px;
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      box-sizing: border-box;
-    }
-    
-    .chart-container {
-      width: 100%;
-      height: 200px;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="container">
     <div id="map"></div>
-
     <div id="sensor-list">
       <img src="Roquette_sensor.png" alt="Roquette Sensor Logo" class="logo">
       <input type="text" id="search-bar" placeholder="Search by plant type" oninput="filterSensors()">
