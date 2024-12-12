@@ -64,6 +64,9 @@ static void prepareTxFrame(uint8_t port) {
   Wire.begin(21, 20);
   gxhtc.read_data();
 
+  //Fake data
+  float fakeSoilMoisturePercent = 69;
+
   // Lecture du capteur d'humidité du sol
   int soilMoistureValue = analogRead(SOIL_MOISTURE_PIN);
   float soilMoisturePercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
@@ -86,7 +89,13 @@ static void prepareTxFrame(uint8_t port) {
   appData[appDataSize++] = puc[2];
   appData[appDataSize++] = puc[3];
 
-   puc = (unsigned char *)(&soilMoistureValue);
+  puc = (unsigned char *)(&soilMoistureValue);
+  appData[appDataSize++] = puc[0];
+  appData[appDataSize++] = puc[1];
+  appData[appDataSize++] = puc[2];
+  appData[appDataSize++] = puc[3];
+
+  puc = (unsigned char *)(&fakeSoilMoisturePercent);
   appData[appDataSize++] = puc[0];
   appData[appDataSize++] = puc[1];
   appData[appDataSize++] = puc[2];
