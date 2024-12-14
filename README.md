@@ -1,6 +1,9 @@
 # Roquette Sensor Project
 
-The **Roquette Sensor Project** is an IoT-based solution for monitoring soil moisture levels in agricultural fields. It integrates a GPS module, a soil moisture sensor, and LoRa communication to provide real-time updates and alerts to farmers. The system is designed to help optimize field management by providing actionable insights for irrigation, planting, and harvesting.
+The **Roquette Sensor Project** is an IoT-based solution for monitoring soil moisture levels in agricultural fields. It integrates a GPS module, a soil moisture sensor, and LoRa communication to provide real-time updates and alerts to farmers. The system is designed to help optimize field management by providing actionable insights for irrigation, planting, and harvesting. 
+
+See the [Project report (PDF)]( https://ecambxl-my.sharepoint.com/:b:/g/personal/20342_ecam_be/EdgzUPAuNTlOnrlUAXVl4SIB9g5uTVqBaViRzQ9YcXfF1A?e=G56xyh)
+
 
 ---
 
