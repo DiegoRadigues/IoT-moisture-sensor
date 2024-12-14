@@ -51,25 +51,25 @@ The Node.js server (`server.js`) handles:
 
 ### Backend Setup
 1. Clone the repository:
-   ```bash
+```bash
    git clone https://github.com/DiegoRadigues/IoT-moisture-sensor.git
    cd IoT-moisture-sensor
-   ```
+ ```
 
 2. Install the dependencies:
-  ```bash
+```bash
   npm install
-  ```
+```
 
 3. Start the server:
-  ```bash
+```bash
   node server.js
-  ```
+```
 
 4. Open your browser and navigate to:
-  ```arduino
+```arduino
   http://localhost:3000
-  ```
+```
 
 ---
 
@@ -89,6 +89,8 @@ The web interface allows users to:
 - View sensor locations on an interactive map (powered by Leaflet.js).
 - Monitor real-time soil moisture data with historical trends.
 - Set thresholds and customize alerts for specific crops.
+  
+![interface_zoom](https://github.com/user-attachments/assets/dae14534-d5b5-4d39-8262-f6f53a98898d)
 
 ---
 
@@ -113,7 +115,7 @@ The web interface allows users to:
 - Integrating additional sensors (e.g., pH, temperature, or pollutants).
 - Adding battery monitoring.
 - Migrating from JSON storage to a SQL database for better scalability.
-- - Implementing predictive analytics using machine learning.
+- Implementing predictive analytics using machine learning.
 
 ---
 
