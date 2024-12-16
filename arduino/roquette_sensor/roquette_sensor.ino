@@ -66,6 +66,8 @@ static void prepareTxFrame(uint8_t port) {
 
   //Fake data
   float fakeSoilMoisturePercent = 69;
+  float fakeAltitude = 50.857285;
+  float fakeLongitude = 4.433293;
 
   // Lecture du capteur d'humidité du sol
   int soilMoistureValue = analogRead(SOIL_MOISTURE_PIN);
@@ -96,6 +98,18 @@ static void prepareTxFrame(uint8_t port) {
   appData[appDataSize++] = puc[3];
 
   puc = (unsigned char *)(&fakeSoilMoisturePercent);
+  appData[appDataSize++] = puc[0];
+  appData[appDataSize++] = puc[1];
+  appData[appDataSize++] = puc[2];
+  appData[appDataSize++] = puc[3];
+
+  puc = (unsigned char *)(&fakeAltitude);
+  appData[appDataSize++] = puc[0];
+  appData[appDataSize++] = puc[1];
+  appData[appDataSize++] = puc[2];
+  appData[appDataSize++] = puc[3];
+
+  puc = (unsigned char *)(&fakeLongitude);
   appData[appDataSize++] = puc[0];
   appData[appDataSize++] = puc[1];
   appData[appDataSize++] = puc[2];
