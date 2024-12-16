@@ -40,17 +40,27 @@ mqttClient.on('message', (topic, message) => {
   console.log("Message reçu depuis TTN :");
   console.log(payload);
 
-  if (payload.uplink_message) {
-    // Extraire les données utiles
-    const { latitude, longitude, humidity, plantType } = payload.uplink_message;
+  if (payload.uplink_message && payload.uplink_message.decoded_payload) {
+    // Extraire les données utiles depuis decoded_payload
+    const {
+      fakeLaltitude: latitude,
+      fakeLongitude: longitude,
+      humidity
+    } = payload.uplink_message.decoded_payload;
 
-    // Sauvegarder dans le tableau gpsData
-    gpsData.push({ latitude, longitude, humidity, plantType });
+    const plantType = "Default"; // Par défaut ou autre valeur statique
 
-    // Diffuser les nouvelles données aux clients via Socket.IO
-    io.emit('gpsData', { latitude, longitude, humidity, plantType });
+    // Vérification des données valides
+    if (latitude && longitude && humidity !== undefined) {
+      console.log(`Données valides reçues : Latitude=${latitude}, Longitude=${longitude}, Humidity=${humidity}`);
+      gpsData.push({ latitude, longitude, humidity, plantType });
+      io.emit('gpsData', { latitude, longitude, humidity, plantType });
+    } else {
+      console.log("Données incomplètes reçues, ignorées.");
+    }
   }
 });
+
 
 app.use(express.static('public'));
 app.use(express.json());
@@ -58,7 +68,13 @@ app.use(express.json());
 app.post('/api/gpsdata', (req, res) => {
   const { latitude, longitude, humidity, plantType } = req.body;
   gpsData.push({ latitude, longitude, humidity, plantType });
-  io.emit('gpsData', { latitude, longitude, humidity, plantType });
+  io.emit('gpsData', { 
+    latitude: payload.uplink_message.decoded_payload.fakeLaltitude,
+    longitude: payload.uplink_message.decoded_payload.fakeLongitude,
+    humidity: payload.uplink_message.decoded_payload.humidity,
+    plantType: "Default" 
+  });
+  
   res.sendStatus(200);
 });
 

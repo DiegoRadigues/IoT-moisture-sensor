@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -25,123 +26,78 @@
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    const plantTypes = [
-      'Wheat', 'Barley', 'Maize', 'Rapeseed', 'Sunflower', 'Sugar beet', 'Potatoes',
-      'Oats', 'Soybeans', 'Rye', 'Pea', 'Dry beans', 'Alfalfa', 'Lentils',
-      'Cabbage', 'Carrots', 'Turnip', 'Buckwheat', 'Spelt', 'Chickpea'
-    ];
-
-    
-    const generateHumidityHistory = (currentHumidity) => {
-      const history = [];
-      let baseHumidity = Math.floor(Math.random() * (60 - 40 + 1)) + 40; 
-      for (let day = 0; day < 6; day++) {
-        for (let hour = 0; hour < 24; hour += 6) {
-          if (day < 2) {
-            history.push(baseHumidity + Math.floor(Math.random() * 10));  
-          } else {
-            baseHumidity -= 2;  
-            history.push(baseHumidity + Math.floor(Math.random() * 5));
-          }
-        }
-      }
-    
-      const lastIndex = history.length - 1;
-      const diff = currentHumidity - history[lastIndex];
-      for (let i = 1; i <= 4; i++) {
-        history[lastIndex - i] += (diff * (i / 4));
-      }
-      history.push(currentHumidity); 
-      return history;
-    };
-
-   
-    const humidityHistory = {
-      0: generateHumidityHistory(55),
-      1: generateHumidityHistory(36),
-      2: generateHumidityHistory(48),
-      3: generateHumidityHistory(35),
-      4: generateHumidityHistory(42),
-      5: generateHumidityHistory(27),
-      6: generateHumidityHistory(44),
-      7: generateHumidityHistory(75),
-      8: generateHumidityHistory(58),
-      9: generateHumidityHistory(22)
-    };
-
-    let gpsData = [
-      { latitude: 50.856988919720735, longitude: 4.454207442554623, humidity: 55, plantType: 'Wheat', lowerThreshold: 40, upperThreshold: 70 },
-      { latitude: 50.85885686800105, longitude: 4.455678156221332, humidity: 36, plantType: 'Barley', lowerThreshold: 35, upperThreshold: 65 },
-      { latitude: 50.85772715972026, longitude: 4.458530986398668, humidity: 48, plantType: 'Maize', lowerThreshold: 25, upperThreshold: 80 },
-      { latitude: 50.85716788806581, longitude: 4.462872249768543, humidity: 35, plantType: 'Rapeseed', lowerThreshold: 60, upperThreshold: 75 },
-      { latitude: 50.85184927936786, longitude: 4.4664928060872064, humidity: 42, plantType: 'Sunflower', lowerThreshold: 40, upperThreshold: 85 },
-      { latitude: 50.85412937473604, longitude: 4.451336204364876, humidity: 27, plantType: 'Sugar beet', lowerThreshold: 45, upperThreshold: 70 },
-      { latitude: 50.86027422965854, longitude: 4.448594058963853, humidity: 44, plantType: 'Potatoes', lowerThreshold: 40, upperThreshold: 75 },
-      { latitude: 50.86097853195069, longitude: 4.443637336609332, humidity: 75, plantType: 'Oats', lowerThreshold: 55, upperThreshold: 70 },
-      { latitude: 50.85975954051512, longitude: 4.437393153945382, humidity: 58, plantType: 'Soybeans', lowerThreshold: 70, upperThreshold: 85 },
-      { latitude: 50.85306789531457, longitude: 4.472536845345938, humidity: 22, plantType: 'Rye', lowerThreshold: 55, upperThreshold: 75 }
-    ];
-
+    let gpsData = [];
     let markerMap = {};
     let allMarkers = [];
     let selectedItem = null;
+    let humidityHistory = {}; // Pour stocker l'historique d'humidité
+    let timestamps = {}; // Stocker les timestamps
 
-    
-    const createLabelsForChart = () => {
-      const labels = [];
-      for (let day = 1; day <= 7; day++) {
-        for (let hour = 0; hour < 24; hour += 6) {
-          labels.push(`Day ${day} ${hour}:00`);
-        }
+    // Connexion à Socket.IO
+    const socket = io();
+
+    // Fonction pour ajouter ou mettre à jour un marqueur
+    function updateOrAddMarker(data) {
+      const { latitude, longitude, humidity, plantType } = data;
+      const now = new Date();
+      const timestamp = now.getHours() + ':' + now.getMinutes(); // Afficher uniquement heures:minutes
+      const id = latitude + ',' + longitude;
+
+      // Stocker l'historique d'humidité et les timestamps
+      if (!humidityHistory[id]) {
+        humidityHistory[id] = [humidity];
+        timestamps[id] = [timestamp];
+      } else {
+        humidityHistory[id].push(humidity);
+        timestamps[id].push(timestamp);
       }
-      return labels;
-    };
 
-    function getMarkerIcon(isCritical, isExceeded) {
-      let iconUrl = isCritical ? 'pin_rouge.png' : 'pin_vert.png';
-      if (isExceeded) {
-        iconUrl = 'pin_bleu.png';
-      }
+      let existingMarker = allMarkers.find(marker => 
+        marker.getLatLng().lat === latitude && marker.getLatLng().lng === longitude
+      );
 
-      return L.icon({
-        iconUrl: iconUrl,
-        iconSize: [25, 37],
-        iconAnchor: [12, 41],
-        popupAnchor: [0, -41]
-      });
-    }
+      if (existingMarker) {
+        existingMarker.setPopupContent(getPopupContent(latitude, longitude, humidity, plantType, id));
+      } else {
+        const marker = L.marker([latitude, longitude], {
+          icon: getMarkerIcon(humidity < 40, humidity > 70)
+        }).bindPopup(
+          getPopupContent(latitude, longitude, humidity, plantType, id)
+        );
 
-    function addMarker(lat, lon, humidity, plantType, lowerThreshold, upperThreshold, id) {
-      const isCritical = humidity < lowerThreshold;
-      const isExceeded = humidity > upperThreshold;
-      const markerIcon = getMarkerIcon(isCritical, isExceeded);
-
-      const popupContent = `<b>GPS Position:</b> ${lat} N, ${lon} E<br><b>Humidity:</b> ${humidity}%<br><b>Plant Type:</b> ${plantType}<br>` +
-                           `<div class="chart-container"><canvas id="humidityChart-${id}"></canvas></div>`;
-
-      const marker = L.marker([lat, lon], { icon: markerIcon })
-        .bindPopup(popupContent)
-        .on('popupopen', function() {
-          createHumidityChart(id);
+        marker.on('popupopen', function () {
+          setTimeout(() => createHumidityChart(id), 100);
         });
 
-      marker.on('click', function() {
-        map.flyTo([lat, lon], 15);
-        highlightListItem(id);
-      });
-
-      markerMap[id] = marker;
-      allMarkers.push(marker);
-      marker.addTo(map);
+        markerMap[gpsData.length] = marker;
+        allMarkers.push(marker);
+        marker.addTo(map);
+        gpsData.push({ latitude, longitude, humidity, plantType });
+        addToList(data, gpsData.length - 1);
+      }
     }
 
+    // Fonction pour générer le contenu du popup avec un graphique
+    function getPopupContent(lat, lon, humidity, plantType, id) {
+      return `
+        <b>GPS Position:</b> ${lat} N, ${lon} E<br>
+        <b>Humidity:</b> ${humidity}%<br>
+        <b>Plant Type:</b> ${plantType}<br>
+        <div class="chart-container" style="width: 100%; height: 200px;">
+          <canvas id="humidityChart-${id}"></canvas>
+        </div>
+      `;
+    }
+
+    // Fonction pour créer un graphique d'historique d'humidité
     function createHumidityChart(id) {
       const ctx = document.getElementById(`humidityChart-${id}`).getContext('2d');
       new Chart(ctx, {
         type: 'line',
         data: {
-          labels: createLabelsForChart(),
+          labels: timestamps[id], // Utiliser les timestamps comme labels
           datasets: [{
+            label: 'Humidity over Time',
             data: humidityHistory[id],
             borderColor: 'rgba(75, 192, 192, 1)',
             backgroundColor: 'rgba(75, 192, 192, 0.2)',
@@ -152,141 +108,47 @@
           responsive: true,
           maintainAspectRatio: false,
           scales: {
-            y: {
-              beginAtZero: true,
-              max: 100
-            }
+            y: { beginAtZero: true, max: 100 },
+            x: { title: { display: true, text: 'Time' } }
           },
-          plugins: {
-            legend: {
-              display: false  
-            }
-          }
+          plugins: { legend: { display: false } }
         }
       });
     }
 
-    function updateMarkerIcon(index) {
-      const data = gpsData[index];
-      const isCritical = data.humidity < data.lowerThreshold;
-      const isExceeded = data.humidity > data.upperThreshold;
-      const markerIcon = getMarkerIcon(isCritical, isExceeded);
-      const marker = markerMap[index];
-
-      marker.setIcon(markerIcon);
+    // Fonction pour créer une icône de marqueur
+    function getMarkerIcon(isCritical, isExceeded) {
+      let iconUrl = isCritical ? 'pin_rouge.png' : 'pin_vert.png';
+      if (isExceeded) iconUrl = 'pin_bleu.png';
+      return L.icon({ iconUrl, iconSize: [25, 37], iconAnchor: [12, 41], popupAnchor: [0, -41] });
     }
 
-    function refreshSensorList() {
-      const gpsList = document.getElementById('gps-list');
-      gpsList.innerHTML = '';
-      gpsData.forEach((data, index) => {
-        addMarker(data.latitude, data.longitude, data.humidity, data.plantType, data.lowerThreshold, data.upperThreshold, index);
-        addToList(data, index);
-      });
-    }
-
-    function addToList({ latitude, longitude, humidity, plantType, lowerThreshold, upperThreshold }, index) {
+    // Fonction pour ajouter une entrée à la liste des capteurs
+    function addToList({ latitude, longitude, humidity, plantType }, index) {
       const gpsList = document.getElementById('gps-list');
       const sensorItem = document.createElement('div');
       sensorItem.className = 'sensor-item';
       sensorItem.dataset.index = index;
 
       const gpsCoordinates = `GPS: ${latitude.toFixed(6)} N, ${longitude.toFixed(6)} E`;
+      sensorItem.innerHTML = `<div><b>${gpsCoordinates}</b><br><b>Humidity:</b> ${humidity}%<br><b>Plant Type:</b> ${plantType}</div>`;
 
-      sensorItem.innerHTML = `<div><b>${gpsCoordinates}</b><br><b>Humidity:</b> ${humidity}%</div>`;
-
-      const dropdown = document.createElement('select');
-      plantTypes.forEach(type => {
-        const option = document.createElement('option');
-        option.value = type;
-        option.textContent = type;
-        if (type === plantType) {
-          option.selected = true;
-        }
-        dropdown.appendChild(option);
-      });
-
-      dropdown.addEventListener('change', function() {
-        gpsData[index].plantType = dropdown.value;
-        updateMarkerPopup(index);
-      });
-
-      const lowerThresholdInput = document.createElement('input');
-      lowerThresholdInput.type = 'number';
-      lowerThresholdInput.value = lowerThreshold;
-      lowerThresholdInput.className = 'humidity-threshold';
-      lowerThresholdInput.placeholder = "Lower Threshold";
-
-      const upperThresholdInput = document.createElement('input');
-      upperThresholdInput.type = 'number';
-      upperThresholdInput.value = upperThreshold;
-      upperThresholdInput.className = 'humidity-threshold';
-      upperThresholdInput.placeholder = "Upper Threshold";
-
-      lowerThresholdInput.addEventListener('keydown', function(event) {
-        if (event.key === "Enter") {
-          gpsData[index].lowerThreshold = parseFloat(lowerThresholdInput.value) || 0;
-          checkHumidityLevels(index);
-          updateMarkerIcon(index);
-          sortSensors();
-        }
-      });
-
-      upperThresholdInput.addEventListener('keydown', function(event) {
-        if (event.key === "Enter") {
-          gpsData[index].upperThreshold = parseFloat(upperThresholdInput.value) || 100;
-          checkHumidityLevels(index);
-          updateMarkerIcon(index);
-          sortSensors();
-        }
-      });
-
-      const controls = document.createElement('div');
-      controls.style.display = 'flex';
-      controls.style.justifyContent = 'space-between';
-      controls.appendChild(dropdown);
-      controls.appendChild(lowerThresholdInput);
-      controls.appendChild(upperThresholdInput);
-
-      sensorItem.appendChild(controls);
-
-      sensorItem.addEventListener('click', function() {
+      sensorItem.addEventListener('click', function () {
         const marker = markerMap[index];
         map.flyTo(marker.getLatLng(), 15);
         marker.openPopup();
-        highlightListItem(index);
+        setTimeout(() => createHumidityChart(latitude + ',' + longitude), 100);
       });
 
       gpsList.appendChild(sensorItem);
-
-      checkHumidityLevels(index);
     }
 
-    function updateMarkerPopup(index) {
-      const data = gpsData[index];
-      const marker = markerMap[index];
-      marker.setPopupContent(`<b>GPS Position:</b> ${data.latitude} N, ${data.longitude} E<br><b>Humidity:</b> ${data.humidity}%<br><b>Plant Type:</b> ${data.plantType}`);
-    }
+    // Écoute les données reçues via Socket.IO
+    socket.on('gpsData', (data) => {
+      updateOrAddMarker(data);
+    });
 
-    function checkHumidityLevels(index) {
-      const data = gpsData[index];
-      const sensorItems = document.querySelectorAll('.sensor-item');
-      const sensorItem = sensorItems[index];
-
-      if (data.humidity < data.lowerThreshold) {
-        sensorItem.classList.add('critical');
-        sensorItem.classList.remove('exceeded');
-      } else if (data.humidity > data.upperThreshold) {
-        sensorItem.classList.add('exceeded');
-        sensorItem.classList.remove('critical');
-      } else {
-        sensorItem.classList.remove('critical');
-        sensorItem.classList.remove('exceeded');
-      }
-
-      updateMarkerIcon(index);
-    }
-
+    // Fonction pour filtrer les capteurs dans la liste
     function filterSensors() {
       const searchValue = document.getElementById('search-bar').value.toLowerCase();
       const sensorItems = document.querySelectorAll('.sensor-item');
@@ -302,44 +164,6 @@
         }
       });
     }
-
-    function highlightListItem(index) {
-      const sensorItems = document.querySelectorAll('.sensor-item');
-      
-      if (selectedItem !== null) {
-        sensorItems[selectedItem].classList.remove('selected');
-      }
-      
-      sensorItems[index].classList.add('selected');
-      selectedItem = index;
-
-      sensorItems[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    function sortSensors() {
-      gpsData.sort((a, b) => {
-        if (a.humidity < a.lowerThreshold) return -1;
-        if (b.humidity < b.lowerThreshold) return 1;
-        if (a.humidity > a.upperThreshold) return 1;
-        if (b.humidity > b.upperThreshold) return -1;
-        return 0;
-      });
-      refreshSensorList();
-    }
-
-   
-    map.on('click', function() {
-      if (selectedItem !== null) {
-        const sensorItems = document.querySelectorAll('.sensor-item');
-        sensorItems[selectedItem].classList.remove('selected');
-        selectedItem = null;
-      }
-    });
-
-    sortSensors();
-
   </script>
 </body>
 </html>
-
-
