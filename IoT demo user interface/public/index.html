@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roquette Sensor - GPS Data on Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="container">
+    <div id="map"></div>
+    <div id="sensor-list">
+      <img src="Roquette_sensor.png" alt="Roquette Sensor Logo" class="logo">
+      <input type="text" id="search-bar" placeholder="Search by plant type" oninput="filterSensors()">
+      <div id="gps-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const map = L.map('map').setView([50.856988919720735, 4.454207442554623], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const plantTypes = [
+      'Wheat', 'Barley', 'Maize', 'Rapeseed', 'Sunflower', 'Sugar beet', 'Potatoes',
+      'Oats', 'Soybeans', 'Rye', 'Pea', 'Dry beans', 'Alfalfa', 'Lentils',
+      'Cabbage', 'Carrots', 'Turnip', 'Buckwheat', 'Spelt', 'Chickpea'
+    ];
+
+    
+    const generateHumidityHistory = (currentHumidity) => {
+      const history = [];
+      let baseHumidity = Math.floor(Math.random() * (60 - 40 + 1)) + 40; 
+      for (let day = 0; day < 6; day++) {
+        for (let hour = 0; hour < 24; hour += 6) {
+          if (day < 2) {
+            history.push(baseHumidity + Math.floor(Math.random() * 10));  
+          } else {
+            baseHumidity -= 2;  
+            history.push(baseHumidity + Math.floor(Math.random() * 5));
+          }
+        }
+      }
+    
+      const lastIndex = history.length - 1;
+      const diff = currentHumidity - history[lastIndex];
+      for (let i = 1; i <= 4; i++) {
+        history[lastIndex - i] += (diff * (i / 4));
+      }
+      history.push(currentHumidity); 
+      return history;
+    };
+
+   
+    const humidityHistory = {
+      0: generateHumidityHistory(55),
+      1: generateHumidityHistory(36),
+      2: generateHumidityHistory(48),
+      3: generateHumidityHistory(35),
+      4: generateHumidityHistory(42),
+      5: generateHumidityHistory(27),
+      6: generateHumidityHistory(44),
+      7: generateHumidityHistory(75),
+      8: generateHumidityHistory(58),
+      9: generateHumidityHistory(22)
+    };
+
+    let gpsData = [
+      { latitude: 50.856988919720735, longitude: 4.454207442554623, humidity: 55, plantType: 'Wheat', lowerThreshold: 40, upperThreshold: 70 },
+      { latitude: 50.85885686800105, longitude: 4.455678156221332, humidity: 36, plantType: 'Barley', lowerThreshold: 35, upperThreshold: 65 },
+      { latitude: 50.85772715972026, longitude: 4.458530986398668, humidity: 48, plantType: 'Maize', lowerThreshold: 25, upperThreshold: 80 },
+      { latitude: 50.85716788806581, longitude: 4.462872249768543, humidity: 35, plantType: 'Rapeseed', lowerThreshold: 60, upperThreshold: 75 },
+      { latitude: 50.85184927936786, longitude: 4.4664928060872064, humidity: 42, plantType: 'Sunflower', lowerThreshold: 40, upperThreshold: 85 },
+      { latitude: 50.85412937473604, longitude: 4.451336204364876, humidity: 27, plantType: 'Sugar beet', lowerThreshold: 45, upperThreshold: 70 },
+      { latitude: 50.86027422965854, longitude: 4.448594058963853, humidity: 44, plantType: 'Potatoes', lowerThreshold: 40, upperThreshold: 75 },
+      { latitude: 50.86097853195069, longitude: 4.443637336609332, humidity: 75, plantType: 'Oats', lowerThreshold: 55, upperThreshold: 70 },
+      { latitude: 50.85975954051512, longitude: 4.437393153945382, humidity: 58, plantType: 'Soybeans', lowerThreshold: 70, upperThreshold: 85 },
+      { latitude: 50.85306789531457, longitude: 4.472536845345938, humidity: 22, plantType: 'Rye', lowerThreshold: 55, upperThreshold: 75 }
+    ];
+
+    let markerMap = {};
+    let allMarkers = [];
+    let selectedItem = null;
+
+    
+    const createLabelsForChart = () => {
+      const labels = [];
+      for (let day = 1; day <= 7; day++) {
+        for (let hour = 0; hour < 24; hour += 6) {
+          labels.push(`Day ${day} ${hour}:00`);
+        }
+      }
+      return labels;
+    };
+
+    function getMarkerIcon(isCritical, isExceeded) {
+      let iconUrl = isCritical ? 'pin_rouge.png' : 'pin_vert.png';
+      if (isExceeded) {
+        iconUrl = 'pin_bleu.png';
+      }
+
+      return L.icon({
+        iconUrl: iconUrl,
+        iconSize: [25, 37],
+        iconAnchor: [12, 41],
+        popupAnchor: [0, -41]
+      });
+    }
+
+    function addMarker(lat, lon, humidity, plantType, lowerThreshold, upperThreshold, id) {
+      const isCritical = humidity < lowerThreshold;
+      const isExceeded = humidity > upperThreshold;
+      const markerIcon = getMarkerIcon(isCritical, isExceeded);
+
+      const popupContent = `<b>GPS Position:</b> ${lat} N, ${lon} E<br><b>Humidity:</b> ${humidity}%<br><b>Plant Type:</b> ${plantType}<br>` +
+                           `<div class="chart-container"><canvas id="humidityChart-${id}"></canvas></div>`;
+
+      const marker = L.marker([lat, lon], { icon: markerIcon })
+        .bindPopup(popupContent)
+        .on('popupopen', function() {
+          createHumidityChart(id);
+        });
+
+      marker.on('click', function() {
+        map.flyTo([lat, lon], 15);
+        highlightListItem(id);
+      });
+
+      markerMap[id] = marker;
+      allMarkers.push(marker);
+      marker.addTo(map);
+    }
+
+    function createHumidityChart(id) {
+      const ctx = document.getElementById(`humidityChart-${id}`).getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: createLabelsForChart(),
+          datasets: [{
+            data: humidityHistory[id],
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 100
+            }
+          },
+          plugins: {
+            legend: {
+              display: false  
+            }
+          }
+        }
+      });
+    }
+
+    function updateMarkerIcon(index) {
+      const data = gpsData[index];
+      const isCritical = data.humidity < data.lowerThreshold;
+      const isExceeded = data.humidity > data.upperThreshold;
+      const markerIcon = getMarkerIcon(isCritical, isExceeded);
+      const marker = markerMap[index];
+
+      marker.setIcon(markerIcon);
+    }
+
+    function refreshSensorList() {
+      const gpsList = document.getElementById('gps-list');
+      gpsList.innerHTML = '';
+      gpsData.forEach((data, index) => {
+        addMarker(data.latitude, data.longitude, data.humidity, data.plantType, data.lowerThreshold, data.upperThreshold, index);
+        addToList(data, index);
+      });
+    }
+
+    function addToList({ latitude, longitude, humidity, plantType, lowerThreshold, upperThreshold }, index) {
+      const gpsList = document.getElementById('gps-list');
+      const sensorItem = document.createElement('div');
+      sensorItem.className = 'sensor-item';
+      sensorItem.dataset.index = index;
+
+      const gpsCoordinates = `GPS: ${latitude.toFixed(6)} N, ${longitude.toFixed(6)} E`;
+
+      sensorItem.innerHTML = `<div><b>${gpsCoordinates}</b><br><b>Humidity:</b> ${humidity}%</div>`;
+
+      const dropdown = document.createElement('select');
+      plantTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = type;
+        if (type === plantType) {
+          option.selected = true;
+        }
+        dropdown.appendChild(option);
+      });
+
+      dropdown.addEventListener('change', function() {
+        gpsData[index].plantType = dropdown.value;
+        updateMarkerPopup(index);
+      });
+
+      const lowerThresholdInput = document.createElement('input');
+      lowerThresholdInput.type = 'number';
+      lowerThresholdInput.value = lowerThreshold;
+      lowerThresholdInput.className = 'humidity-threshold';
+      lowerThresholdInput.placeholder = "Lower Threshold";
+
+      const upperThresholdInput = document.createElement('input');
+      upperThresholdInput.type = 'number';
+      upperThresholdInput.value = upperThreshold;
+      upperThresholdInput.className = 'humidity-threshold';
+      upperThresholdInput.placeholder = "Upper Threshold";
+
+      lowerThresholdInput.addEventListener('keydown', function(event) {
+        if (event.key === "Enter") {
+          gpsData[index].lowerThreshold = parseFloat(lowerThresholdInput.value) || 0;
+          checkHumidityLevels(index);
+          updateMarkerIcon(index);
+          sortSensors();
+        }
+      });
+
+      upperThresholdInput.addEventListener('keydown', function(event) {
+        if (event.key === "Enter") {
+          gpsData[index].upperThreshold = parseFloat(upperThresholdInput.value) || 100;
+          checkHumidityLevels(index);
+          updateMarkerIcon(index);
+          sortSensors();
+        }
+      });
+
+      const controls = document.createElement('div');
+      controls.style.display = 'flex';
+      controls.style.justifyContent = 'space-between';
+      controls.appendChild(dropdown);
+      controls.appendChild(lowerThresholdInput);
+      controls.appendChild(upperThresholdInput);
+
+      sensorItem.appendChild(controls);
+
+      sensorItem.addEventListener('click', function() {
+        const marker = markerMap[index];
+        map.flyTo(marker.getLatLng(), 15);
+        marker.openPopup();
+        highlightListItem(index);
+      });
+
+      gpsList.appendChild(sensorItem);
+
+      checkHumidityLevels(index);
+    }
+
+    function updateMarkerPopup(index) {
+      const data = gpsData[index];
+      const marker = markerMap[index];
+      marker.setPopupContent(`<b>GPS Position:</b> ${data.latitude} N, ${data.longitude} E<br><b>Humidity:</b> ${data.humidity}%<br><b>Plant Type:</b> ${data.plantType}`);
+    }
+
+    function checkHumidityLevels(index) {
+      const data = gpsData[index];
+      const sensorItems = document.querySelectorAll('.sensor-item');
+      const sensorItem = sensorItems[index];
+
+      if (data.humidity < data.lowerThreshold) {
+        sensorItem.classList.add('critical');
+        sensorItem.classList.remove('exceeded');
+      } else if (data.humidity > data.upperThreshold) {
+        sensorItem.classList.add('exceeded');
+        sensorItem.classList.remove('critical');
+      } else {
+        sensorItem.classList.remove('critical');
+        sensorItem.classList.remove('exceeded');
+      }
+
+      updateMarkerIcon(index);
+    }
+
+    function filterSensors() {
+      const searchValue = document.getElementById('search-bar').value.toLowerCase();
+      const sensorItems = document.querySelectorAll('.sensor-item');
+      sensorItems.forEach(item => {
+        const index = item.dataset.index;
+        const marker = markerMap[index];
+        if (gpsData[index].plantType.toLowerCase().includes(searchValue)) {
+          item.style.display = '';
+          marker.addTo(map);
+        } else {
+          item.style.display = 'none';
+          map.removeLayer(marker);
+        }
+      });
+    }
+
+    function highlightListItem(index) {
+      const sensorItems = document.querySelectorAll('.sensor-item');
+      
+      if (selectedItem !== null) {
+        sensorItems[selectedItem].classList.remove('selected');
+      }
+      
+      sensorItems[index].classList.add('selected');
+      selectedItem = index;
+
+      sensorItems[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function sortSensors() {
+      gpsData.sort((a, b) => {
+        if (a.humidity < a.lowerThreshold) return -1;
+        if (b.humidity < b.lowerThreshold) return 1;
+        if (a.humidity > a.upperThreshold) return 1;
+        if (b.humidity > b.upperThreshold) return -1;
+        return 0;
+      });
+      refreshSensorList();
+    }
+
+   
+    map.on('click', function() {
+      if (selectedItem !== null) {
+        const sensorItems = document.querySelectorAll('.sensor-item');
+        sensorItems[selectedItem].classList.remove('selected');
+        selectedItem = null;
+      }
+    });
+
+    sortSensors();
+
+  </script>
+</body>
+</html>
+
+
