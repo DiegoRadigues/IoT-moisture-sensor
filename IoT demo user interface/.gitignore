@@ -1,0 +1,47 @@
+# Fichiers système
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Fichiers de logs et temporaires
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.swn
+*.~*
+
+# Dossiers spécifiques à l'environnement
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Paramètres de l'éditeur/code IDE
+.vscode/
+.idea/
+*.iml
+
+# Binaires et fichiers compilés
+*.bin
+*.hex
+*.elf
+*.exe
+*.dll
+*.out
+*.o
+*.a
+*.lib
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Répertoires à exclure
+logs/
+temp/
+build/
+dist/
